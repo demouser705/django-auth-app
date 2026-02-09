@@ -20,13 +20,13 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
 
         if user is not None:
-            login(request, user)
-            messages.success(request, f'Welcome back, {user.username}!')
-            return redirect('home')
-        else:
-            # Fixed: Don't access user.username when user is None
-            messages.error(request, 'Invalid username or password.')
-            return redirect('login')
+    login(request, user)
+    messages.success(request, f'Welcome back, {user.username}!')
+    return redirect('home')
+else:
+    # Fixed: Don't access user.username when user is None
+    messages.error(request, 'Invalid username or password.')
+    return redirect('login')
 
     return render(request, 'login.html')
 
