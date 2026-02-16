@@ -124,3 +124,20 @@ def export_data(request):
     
     return response
 */
+
+
+// ═══════════════════════════════════════════════════════════
+// SUGGESTED FIX - Apply the following code changes:
+// ═══════════════════════════════════════════════════════════
+/*
+user = authenticate(request, username=username, password=password)
+
+        if user is not None:
+            login(request, user)
+            messages.success(request, f'Welcome back, {user.username}!')
+            return redirect('home')
+        else:
+            # Use the input 'username' variable instead of user.username since user is None
+            messages.error(request, 'Invalid username or password.')
+            return redirect('login')
+*/
