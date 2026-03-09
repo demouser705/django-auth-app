@@ -1,10 +1,11 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.views.decorators.http import require_http_methods
-
+from django.http import HttpResponse, HttpResponseForbidden
+import csv
 
 @require_http_methods(["GET", "POST"])
 def login_view(request):
@@ -29,7 +30,6 @@ def login_view(request):
             return redirect('login')
 
     return render(request, 'login.html')
-
 
 @require_http_methods(["GET", "POST"])
 def signup_view(request):
@@ -66,19 +66,16 @@ def signup_view(request):
 
     return render(request, 'signup.html')
 
-
 @login_required(login_url='login')
 def home(request):
     """Home page for logged-in users"""
     return render(request, 'home.html', {'user': request.user})  # Fixed: Render home template instead of redirect
-
 
 # FIXED: Add authentication requirement
 @login_required(login_url='login')
 def profile_view(request):
     """User profile page"""
     return render(request, 'profile.html', {'user': request.user})
-
 
 @require_http_methods(["POST"])
 def logout_view(request):
@@ -87,17 +84,8 @@ def logout_view(request):
     messages.success(request, 'You have been logged out successfully.')
     return redirect('login')
 
-
 def about(request):
     return render(request, 'about.html')
-
-// ═══════════════════════════════════════════════════════════
-// SUGGESTED FIX - Apply the following code changes:
-// ═══════════════════════════════════════════════════════════
-/*
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.http import HttpResponse, HttpResponseForbidden
-import csv
 
 def is_admin(user):
     """Check if user is admin/staff"""
@@ -109,35 +97,12 @@ def export_data(request):
     """Export user data - restricted to admin users only"""
     if not request.user.is_staff and not request.user.is_superuser:
         return HttpResponseForbidden("Access denied. Admin privileges required.")
-    
     # Create CSV response
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="users_export.csv"'
-    
     writer = csv.writer(response)
     writer.writerow(['ID', 'Username', 'Email', 'Date Joined', 'Is Active'])
-    
-    # Only export non-sensitive user data
     users = User.objects.all().values_list('id', 'username', 'email', 'date_joined', 'is_active')
     for user in users:
         writer.writerow(user)
-    
     return response
-*/
-
-
-// ═══════════════════════════════════════════════════════════
-// SUGGESTED FIX - Apply the following code changes:
-// ═══════════════════════════════════════════════════════════
-/*
-user = authenticate(request, username=username, password=password)
-
-        if user is not None:
-            login(request, user)
-            messages.success(request, f'Welcome back, {user.username}!')
-            return redirect('home')
-        else:
-            # Use the input 'username' variable instead of user.username since user is None
-            messages.error(request, 'Invalid username or password.')
-            return redirect('login')
-*/
