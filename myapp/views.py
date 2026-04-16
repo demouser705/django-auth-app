@@ -17,6 +17,7 @@ def login_view(request):
             messages.error(request, 'Please provide both username and password.')
             return redirect('login')
 
+        # Ensure password is passed as-is to authenticate (supports special characters)
         user = authenticate(request, username=username, password=password)
 
         if user is not None:
@@ -24,7 +25,6 @@ def login_view(request):
             messages.success(request, f'Welcome back, {user.username}!')
             return redirect('home')
         else:
-            # Fixed: Don't access user.username when user is None
             messages.error(request, 'Invalid username or password.')
             return redirect('login')
 
@@ -70,10 +70,9 @@ def signup_view(request):
 @login_required(login_url='login')
 def home(request):
     """Home page for logged-in users"""
-    return render(request, 'home.html', {'user': request.user})  # Fixed: Render home template instead of redirect
+    return render(request, 'home.html', {'user': request.user})
 
 
-# FIXED: Add authentication requirement
 @login_required(login_url='login')
 def profile_view(request):
     """User profile page"""
@@ -90,54 +89,3 @@ def logout_view(request):
 
 def about(request):
     return render(request, 'about.html')
-
-// ═══════════════════════════════════════════════════════════
-// SUGGESTED FIX - Apply the following code changes:
-// ═══════════════════════════════════════════════════════════
-/*
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.http import HttpResponse, HttpResponseForbidden
-import csv
-
-def is_admin(user):
-    """Check if user is admin/staff"""
-    return user.is_authenticated and (user.is_staff or user.is_superuser)
-
-@login_required(login_url='login')
-@user_passes_test(is_admin, login_url='login')
-def export_data(request):
-    """Export user data - restricted to admin users only"""
-    if not request.user.is_staff and not request.user.is_superuser:
-        return HttpResponseForbidden("Access denied. Admin privileges required.")
-    
-    # Create CSV response
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="users_export.csv"'
-    
-    writer = csv.writer(response)
-    writer.writerow(['ID', 'Username', 'Email', 'Date Joined', 'Is Active'])
-    
-    # Only export non-sensitive user data
-    users = User.objects.all().values_list('id', 'username', 'email', 'date_joined', 'is_active')
-    for user in users:
-        writer.writerow(user)
-    
-    return response
-*/
-
-
-// ═══════════════════════════════════════════════════════════
-// SUGGESTED FIX - Apply the following code changes:
-// ═══════════════════════════════════════════════════════════
-/*
-user = authenticate(request, username=username, password=password)
-
-        if user is not None:
-            login(request, user)
-            messages.success(request, f'Welcome back, {user.username}!')
-            return redirect('home')
-        else:
-            # Use the input 'username' variable instead of user.username since user is None
-            messages.error(request, 'Invalid username or password.')
-            return redirect('login')
-*/
