@@ -1,0 +1,255 @@
+###### FILE: code/inc/command_parser.h ######
+#ifndef COMMAND_PARSER_H
+#define COMMAND_PARSER_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+void command_parser_init(void);
+void command_parser_update(void);
+bool command_parser_get_latest(uint8_t *pos);
+
+#endif /* COMMAND_PARSER_H */
+###### END FILE ######
+###### FILE: code/inc/feedback_processor.h ######
+#ifndef FEEDBACK_PROCESSOR_H
+#define FEEDBACK_PROCESSOR_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+void feedback_processor_init(void);
+void feedback_processor_update(void);
+bool feedback_processor_get_position(uint8_t *pos);
+
+#endif /* FEEDBACK_PROCESSOR_H */
+###### END FILE ######
+###### FILE: code/inc/flap_control_logic.h ######
+#ifndef FLAP_CONTROL_LOGIC_H
+#define FLAP_CONTROL_LOGIC_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+void flap_control_logic_init(void);
+void flap_control_logic_process(void);
+
+#endif /* FLAP_CONTROL_LOGIC_H */
+###### END FILE ######
+###### FILE: code/inc/led_status_handler.h ######
+#ifndef LED_STATUS_HANDLER_H
+#define LED_STATUS_HANDLER_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+void led_status_handler_init(void);
+void led_status_handler_set(uint8_t pos);
+void led_status_handler_error(void);
+
+#endif /* LED_STATUS_HANDLER_H */
+###### END FILE ######
+###### FILE: code/inc/motor_driver.h ######
+#ifndef MOTOR_DRIVER_H
+#define MOTOR_DRIVER_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+typedef enum {
+    MOTOR_DIR_STOP = 0,
+    MOTOR_DIR_FORWARD,
+    MOTOR_DIR_REVERSE
+} motor_dir_t;
+
+void motor_driver_init(void);
+void motor_driver_drive(motor_dir_t dir, bool enable);
+void motor_driver_stop(void);
+
+#endif /* MOTOR_DRIVER_H */
+###### END FILE ######
+###### FILE: code/inc/system_startup.h ######
+#ifndef SYSTEM_STARTUP_H
+#define SYSTEM_STARTUP_H
+
+void system_init(void);
+
+#endif /* SYSTEM_STARTUP_H */
+###### END FILE ######
+###### FILE: code/src/command_parser.c ######
+#include "command_parser.h"
+#include "uart_device.h" /* abstracted UART */
+
+static uint8_t latest_cmd;
+static bool valid_cmd;
+
+void command_parser_init(void) {
+    latest_cmd = 0U;
+    valid_cmd = false;
+}
+
+void command_parser_update(void) {
+    uint8_t byte;
+    if (uart_device_get_byte(&byte)) {
+        if (byte <= MAX_POSITION) {
+            latest_cmd = byte;
+            valid_cmd = true;
+        } else {
+            valid_cmd = false;
+        }
+    }
+}
+
+bool command_parser_get_latest(uint8_t *pos) {
+    if (valid_cmd) {
+        *pos = latest_cmd;
+        return true;
+    }
+    return false;
+}
+###### END FILE ######
+###### FILE: code/src/feedback_processor.c ######
+#include "feedback_processor.h"
+#include "adc_device.h" /* abstracted ADC */
+
+static uint8_t current_pos;
+static bool valid_pos;
+
+void feedback_processor_init(void) {
+    current_pos = 0U;
+    valid_pos = false;
+}
+
+void feedback_processor_update(void) {
+    uint16_t sample;
+    if (adc_device_get_sample(&sample)) {
+        if (sample <= MAX_ADC_VALUE) {
+            current_pos = map_adc_to_position(sample);
+            valid_pos = true;
+        } else {
+            valid_pos = false;
+        }
+    }
+}
+
+bool feedback_processor_get_position(uint8_t *pos) {
+    if (valid_pos) {
+        *pos = current_pos;
+        return true;
+    }
+    return false;
+}
+###### END FILE ######
+###### FILE: code/src/flap_control_logic.c ######
+#include "flap_control_logic.h"
+#include "command_parser.h"
+#include "feedback_processor.h"
+#include "motor_driver.h"
+#include "led_status_handler.h"
+
+static uint8_t target_pos;
+static uint8_t current_pos;
+static bool moving;
+
+void flap_control_logic_init(void) {
+    target_pos = 0U;
+    current_pos = 0U;
+    moving = false;
+}
+
+void flap_control_logic_process(void) {
+    uint8_t cmd;
+    if (command_parser_get_latest(&cmd)) {
+        if (feedback_processor_get_position(&current_pos)) {
+            if (cmd != current_pos) {
+                target_pos = cmd;
+                motor_driver_drive((cmd > current_pos) ? MOTOR_DIR_FORWARD : MOTOR_DIR_REVERSE, true);
+                moving = true;
+                led_status_handler_set(cmd);
+            }
+        }
+    }
+    if (moving && feedback_processor_get_position(&current_pos)) {
+        if (current_pos == target_pos) {
+            motor_driver_stop();
+            moving = false;
+        }
+    }
+}
+###### END FILE ######
+###### FILE: code/src/led_status_handler.c ######
+#include "led_status_handler.h"
+#include "gpio_device.h" /* abstracted GPIO */
+
+void led_status_handler_init(void) {
+    gpio_device_set_power_led(true);
+}
+
+void led_status_handler_set(uint8_t pos) {
+    gpio_device_clear_all_leds();
+    gpio_device_set_position_led(pos);
+}
+
+void led_status_handler_error(void) {
+    gpio_device_set_error_led(true);
+}
+###### END FILE ######
+###### FILE: code/src/main.c ######
+#include "system_startup.h"
+#include "command_parser.h"
+#include "flap_control_logic.h"
+#include "feedback_processor.h"
+#include "motor_driver.h"
+#include "led_status_handler.h"
+
+int main(void) {
+    system_init();
+    for(;;) {
+        command_parser_update();
+        feedback_processor_update();
+        flap_control_logic_process();
+    }
+    return 0;
+}
+###### END FILE ######
+###### FILE: code/src/motor_driver.c ######
+#include "motor_driver.h"
+#include "pwm_device.h" /* abstracted PWM */
+#include "gpio_device.h"
+
+void motor_driver_init(void) {
+    pwm_device_set_duty(0U);
+    gpio_device_set_motor_enable(false);
+}
+
+void motor_driver_drive(motor_dir_t dir, bool enable) {
+    gpio_device_set_motor_direction(dir);
+    gpio_device_set_motor_enable(enable);
+    if (enable) {
+        pwm_device_set_duty(DEFAULT_DUTY);
+    } else {
+        pwm_device_set_duty(0U);
+    }
+}
+
+void motor_driver_stop(void) {
+    gpio_device_set_motor_enable(false);
+    pwm_device_set_duty(0U);
+}
+###### END FILE ######
+###### FILE: code/src/system_startup.c ######
+#include "system_startup.h"
+#include "command_parser.h"
+#include "flap_control_logic.h"
+#include "feedback_processor.h"
+#include "motor_driver.h"
+#include "led_status_handler.h"
+
+void system_init(void) {
+    command_parser_init();
+    feedback_processor_init();
+    motor_driver_init();
+    led_status_handler_init();
+    flap_control_logic_init();
+}
+###### END FILE ######
